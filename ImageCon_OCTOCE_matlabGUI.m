@@ -1,7 +1,7 @@
 tic
 
 Samplefreq=20730;
-Mainfreq=1000; %Vibration Frequency
+Mainfreq=650; %Vibration Frequency
 
 pixel=1024; %camera pixel
 % line=handles.ImageNum; %A-line number
@@ -14,13 +14,12 @@ framenum=512; %frame number
 % coefs = flip([79.6291e-009  -355.7041e-006     1.2153e+000   251.3817e+000]);%direct
 % coefs = flip([74.6291e-009  -375.7041e-006     1.2553e+000   251.3817e+000]);%Guan refined Untitle3
 % coefs = flip([84.5291e-009  -305.7041e-006     1.0553e+000   251.3817e+000]);%Guan unti log only maxim-mean
-% coefs = flip([84.3319e-009  
-% -304.1041e-006     1.0503e+000 251.3817e+000]); %refine1 txt2
-% coefs = flip([99.6354e-009  -340.5450e-006     1.1119e+000   248.8901e+000]); %refine1 txt1
+% coefs = flip([84.3319e-009  -304.1041e-006     1.0503e+000 251.3817e+000]); %refine1 txt2
+coefs = flip([100.4106e-009  -371.9907e-006     1.2013e+000   251.1737e+000]);
 % % coefs=[-2.475E+1	1.336E+0	-3.767E-4	7.13E-8];%handles
 % coefs=handles.coefs;
 % coefs=[0 1 0 0];
-coefs = flip([94.9677e-009  -325.9600e-006     1.0885e+000   251.3817e+000]);
+% coefs = flip([94.9677e-009  -325.9600e-006     1.0885e+000   251.3817e+000]);
 % coefs=[-2.475e1 1.336e0 -3.767e-4 7.13e-8];
 p=fliplr(coefs); 
 K=1:pixel; 
@@ -37,8 +36,8 @@ evenK = diffMean*(cumsum(ones(1,1024))-1)+KK(1);
 %Parameter for step1
 BS_CL=100; %B-scan check line
 
-Deta1= round(Mainfreq*(framenum-2)/Samplefreq)-1; %Vibration Frequency Position
-Deta2= round(Mainfreq*(framenum-2)/Samplefreq)+1;
+Deta1= round(Mainfreq*(framenum-2)/Samplefreq); %Vibration Frequency Position
+Deta2= round(Mainfreq*(framenum-2)/Samplefreq)+2;
 %Parameter for step2
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 clearvars RawRef
@@ -55,15 +54,15 @@ clearvars filename p CompSpectrum
 % ComplexFrames=temp(depth+1:end,:,:);
 ComplexFrames=temp(1:depth,:,:);%dpeth resolved info (Complex matrix 512*512*512)
 clearvars temp
-figure;imshow(20*log10(abs(squeeze(ComplexFrames(:,:,100)))),[20 80]);title('Structure Image');
-colorbar
+
 
 ImageBS = mean(abs(ComplexFrames(:,:,:)),3);
+figure;imshow(20*log10(ImageBS),[20 80]);title('Structure Image');
+colorbar
 % ImageBS = abs(ComplexFrames(:,:,1:end-1));
 
 Phframes=angle((ComplexFrames(:,:,2:end-1)).*conj((ComplexFrames(:,:,3:end)))); %Phase image
 % Phframes = angle(ComplexFrames(:,:,2:end-1));
-% Phframes = unwrap(Phframes,[],3);
 % Phframes = medfilt3(Phframes,[3 3 1]);
 % 
 % Phframes = angle((ComplexFrames(:,:,2:end-1)))./abs(ComplexFrames(:,:,2:end-1))-...
@@ -76,7 +75,7 @@ Phframes=angle((ComplexFrames(:,:,2:end-1)).*conj((ComplexFrames(:,:,3:end)))); 
 
 % ImCon_Bs=get(handles.Image,'CData'); %Structure image 
 
-A_a1 = Phframes; %Phase Difference
+A_a1 = unwrap(Phframes,[],3); %Phase Difference
 % A_a1=A_a1.*(A_a1<0.5);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -97,40 +96,36 @@ A_a1 = Phframes; %Phase Difference
 Ap1=abs(fft(A_a1,[],3));
 %&&&&&&&&&&&&&&&& image the vabration &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&        
 AmF1=max(Ap1(:,:,Deta1:Deta2),[],3);
-MeanAmF=mean(Ap1(:,:,Deta2+7:Deta2+17),3);
+MeanAmF=mean(Ap1(:,:,[Deta1-6:Deta2-4,Deta2+4:Deta2+6]),3);
 Snr=AmF1./MeanAmF;
 Snr_TF=Snr<100;
-AbsImAmpVM1=(AmF1-MeanAmF);
-
+AbsImAmpVM1=(AmF1);
+% AbsImAmpVM1 = medfilt2(AbsImAmpVM1,[2 2]);
 % AbsImAmpVM1 = AbsImAmpVM1.*(20*log10(abs(squeeze(ComplexFrames(:,:,100))))>40).*((log10(Snr))>1);
+figure;imagesc(Snr,[100 150]);colormap(jet);title('SNR')
 
-mask = 20*log10(ImageBS)>50;
 clearvars     Snr_TF
 
 % figure,imshow(ImCon_Bs,[2 4]);%OCT image
 % axis on
 %%%%%%%%%%%%%%%%%%%%%%%OCE image construction%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-m=3;
-strain=zeros(512-m+1,512);
-
-% mask=ImCon_Bs>handles.OCEparameters.StructThresh;
-for j=1:512
-    for i=1:512-m+1
-        strain(i,j)=(6*(2*(i-i)-m+1))*AbsImAmpVM1(i,j)/(m^3-m)*i+(6*(2*(i+1-i)-m+1))...
-            *AbsImAmpVM1(i+1,j)/(m^3-m)*(i+1)+(6*(2*(i+2-i)-m+1))*AbsImAmpVM1(i+2,j)/(m^3-m)*(i+2);...
-            %+(6*(2*(i+3-i)-m+1))*AbsImAmpVM1(i+3,j)/(m^3-m)*(i+3)+(6*(2*(i+4-i)-m+1))*AbsImAmpVM1(i+4,j)/(m^3-m)*(i+4);
+mask = Snr>50;
+AbsImAmpVM2 = AbsImAmpVM1.*mask;
+pixel = 1:512;
+interpRe = zeros(512,512);
+for i = 1:512
+    noneZeroEle = find(AbsImAmpVM2(:,i));
+    if length(noneZeroEle)<=2
+        continue
+    else
+    interpRe(:,i) = interp1(noneZeroEle,AbsImAmpVM2(noneZeroEle,i),1:512,'linear',0);
     end
 end
-Youngs=1./abs(strain);
 
-Y3=193*50*medfilt2(Youngs,[2 2]);
-OCEImg=Y3;
-mask = (20*log10(abs(squeeze(ComplexFrames(:,:,100))))>40).*(Snr>50);
-gra = gradient(AbsImAmpVM1);
-% figure;imagesc(medfilt2(abs(1./gra)*80,[3 3]));colormap(jet);title('gradient')
-figure;imagesc(Y3,[0 300]);colormap(jet);title('after strain stry');colorbar
-figure;imagesc(medfilt2(AbsImAmpVM1,[1 1]),[0 3000]);colormap(jet);title('Vibration Amp')
-toc
-% a = mean(abs(ComplexFrames(1:510,:,:)),3);
-% b = medfilt2(1e4*Youngs./a,[2 2]);
-% figure;imagesc(1e4*b,[0 80]);colormap(jet);title('after comp');
+figure;imagesc(interpRe);colormap(jet);colorbar;title('Vibration Amplitude After Interp')
+aa = zeros(512,512);
+for i =1:512
+   aa(:,i) =  -cwt((interpRe(:,i)),5,'gaus1');
+end
+% aa = movmean(aa,10,1);
+figure;imagesc(1000./aa,[0 300]);colormap(jet);title('Elas processed by CWT')
